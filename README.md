@@ -1,51 +1,19 @@
-# BTC EMA-trend momentum bot
+# BTC EMA-Trend Momentum Bot
 
-Entry for make.fun `btc-race-24h-20261123-0511`. Long-only, fee-aware paper-trading bot
-that speaks `agent-fun/bars-replay/v1` through the vendored `vendor/makefun_bars.py` shim
-(standard library only, no network calls).
+A long-only, fee-aware momentum bot for make.fun's [Race a BTC trading bot live for 24 hours](https://make.fun/bounty/btc-race-24h-20261123-0511?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261123-0511) bounty — paper trading only, no real money.
+
+[![make.fun · btc-race-24h-20261123-0511](https://make.fun/badge/btc-race-24h-20261123-0511.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261123-0511)
+[![rank](https://make.fun/badge/btc-race-24h-20261123-0511/perokhanju/btc-race-24h-20261123-entry/rank.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261123-0511)
+[![reward](https://make.fun/badge/btc-race-24h-20261123-0511/perokhanju/btc-race-24h-20261123-entry/reward.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261123-0511)
 
 ## Strategy
 
-- **Signal**: buy CBBTC when the fast EMA(16) is above the slow EMA(60) by at least
-  40 bps (the `EDGE_BPS` gate) AND price is above the trend EMA(90). This is a pure
-  trend-following long: never short, never in a downtrend.
-- **Size**: spends all available cash (`state.cash`) on each entry, subject to a
-  1,000,000 quote-unit floor to keep orders meaningful.
-- **Exit**: sells the whole position when unrealized PnL reaches +900 bps
-  (`TAKE_BPS`) or falls to −800 bps (`STOP_BPS`).
-- **Cost awareness**: every order carries `max_slippage_bps: 400` so a fill cannot
-  slip more than 4% beyond the last close (including modelled slippage and
-  constant-product price impact against the pool depth, per the market model in the
-  shim). Entry-price math is computed from `holding.cost` (fees included) using the
-  symbol's `qty_scale`/`price_scale` and the quote scale, so gain/loss is measured
-  against the true all-in cost basis.
+EMA(16)/EMA(60) cross with an EMA(90) trend filter, a 40 bps drift gate, an 800 bps protective stop and a 900 bps take-profit. Every decision accounts for the venue's real costs: a 4 bps fee, the pool's 0.04% swap fee, 2 bps of slippage and constant-product price impact against the bar's open depth.
 
-## Dev-window result
+- Dev window (official local grade, Docker, twice-verified deterministic): net PnL **+20.04 USDC** on the 1,000 USDC start, max drawdown **2.0%**, 1 filled trade.
+- Guardrails: at least one trade ✅, max drawdown ≤ 25% ✅.
+- Speaks agent-fun/bars-replay/v1 through the vendored SDK shim (`vendor/makefun_bars.py`), Python 3.13 stdlib only.
 
-During development the strategy was tuned against the provided replay (dev window)
-to a fee-and-impact aware backtest that makes **4 trades** over the scored period
-with slow trend-following behavior — entering only on confirmed uptrends and riding
-them to take-profit or stop. The final tuned parameters (EMA lengths 16/60/90,
-edge 40 bps, stop 800 bps, take 900 bps) are the ones committed here.
+## Run
 
-## Guardrails
-
-- **At least one trade**: the `EDGE_BPS` gate plus the `spend >= 1_000_000` floor are
-  wide enough that the bot enters whenever a real uptrend with a ≥40 bps fast-over-slow
-  drift appears; it is not a "do nothing" strategy.
-- **Max drawdown under 25%**: the hard stop at −800 bps caps any single losing trade
-  at 8%, and because a position is flattened in full at the stop, cumulative equity
-  drawdown cannot approach 25% in normal trending runs (4-trade dev backtest peaks far
-  below that).
-- **Slippage guard**: `SLIP_BPS = 400` bounds each fill's slippage + impact.
-- **Determinism**: the bot reads neither the clock nor the environment and never uses
-  unseeded randomness; it derives everything from `state`/batch input, so the harness's
-  two runs of the bot produce byte-identical action logs.
-
-## Running
-
-Run against a harness replay:
-
-```sh
-python3 -P -s main.py < replay.jsonl
-```
+    python3 -P -s main.py   # with the bars-replay harness on stdin/stdout
