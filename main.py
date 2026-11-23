@@ -7,9 +7,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "ven
 import makefun_bars
 
 SYMBOL = "CBBTC"
-FAST = 16         # fast EMA length (bars)
-SLOW = 60         # slow EMA length (bars)
-TREND = 90        # trend EMA length: only long above it
+FAST_EMA_LEN = 16    # fast EMA length (bars)
+SLOW_EMA_LEN = 60    # slow EMA length (bars)
+TREND_EMA_LEN = 90   # trend EMA length: only long above it
 EDGE_BPS = 40     # minimum fast-over-slow drift before entering
 STOP_BPS = 800    # exit if we fall this far under our entry
 TAKE_BPS = 900    # take profit here
@@ -34,12 +34,12 @@ def on_batch(state, batch):
             closes.append(int(bar["c"]))
     if state.warming_up:
         return []
-    if len(closes) < TREND + 5:
+    if len(closes) < TREND_EMA_LEN + 5:
         return []
     price = state.close(SYMBOL)
-    fast = ema(closes[-(FAST * 3):], FAST)
-    slow = ema(closes[-(SLOW * 3):], SLOW)
-    trend = ema(closes[-(TREND + 5):], TREND)
+    fast = ema(closes[-(FAST_EMA_LEN * 3):], FAST_EMA_LEN)
+    slow = ema(closes[-(SLOW_EMA_LEN * 3):], SLOW_EMA_LEN)
+    trend = ema(closes[-(TREND_EMA_LEN + 5):], TREND_EMA_LEN)
     if fast is None or slow is None or trend is None:
         return []
 
